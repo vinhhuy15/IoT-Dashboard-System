@@ -12,6 +12,7 @@
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;700&family=Anton&display=swap"
         rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 </head>
 
 <body>
@@ -24,7 +25,7 @@
             </div>
             <div class="hero-status-wrap">
                 <div id="connectionStatus" class="hero-status">Firebase: Đang kết nối...</div>
-                <button id="auth-btn" class="hero-action" type="button">Đăng nhập Admin</button>
+                <button id="auth-btn" class="hero-action" type="button">Đăng nhập Face ID</button>
             </div>
         </header>
 
@@ -75,14 +76,6 @@
                         <span class="ai-label">ADMIN ACCESS</span>
                         <strong id="curatorAccess">Đăng nhập demo</strong>
                     </section>
-                    <section class="ai-block ai-info">
-                        <span class="ai-label">ĐỘ ỔN ĐỊNH HỆ THỐNG</span>
-                        <strong id="curatorConfidence">60%</strong>
-                    </section>
-                    <section class="ai-block ai-neutral">
-                        <span class="ai-label">ANOMALY SCORE (AI)</span>
-                        <strong id="anomalyScore">0.0%</strong>
-                    </section>
                     <section class="ai-block ai-neutral">
                         <span class="ai-label">CHẤT LƯỢNG KHÔNG KHÍ (AQI*)</span>
                         <strong id="airQualityValue">--</strong>
@@ -90,10 +83,6 @@
                     <section class="ai-block ai-info">
                         <span class="ai-label">CƯỜNG ĐỘ ÁNH SÁNG</span>
                         <strong id="lightLevelValue">--</strong>
-                    </section>
-                    <section class="ai-block ai-info">
-                        <span class="ai-label">RỦI RO ĐÔ THỊ</span>
-                        <strong id="riskState">Ổn định</strong>
                     </section>
                     <section class="ai-block ai-neutral">
                         <span class="ai-label">NHẬT KÝ HOẠT ĐỘNG</span>
@@ -163,11 +152,46 @@
 
         <div id="login-modal" class="login-modal">
             <div class="login-box">
-                <h3>Đăng nhập Quản trị</h3>
+                <h3>Đăng nhập truyền thống</h3>
                 <input type="email" id="email" placeholder="Email Admin">
                 <input type="password" id="password" placeholder="Mật khẩu">
-                <button class="control-btn btn-on" id="submit-login" type="button">Đăng Nhập</button>
+                <div id="traditional-login-hint" class="modal-hint">Dùng tài khoản truyền thống để thêm/cập nhật khuôn
+                    mặt nhận diện.</div>
+                <button class="control-btn btn-on" id="submit-login" type="button">Đăng nhập truyền thống</button>
+                <button class="hero-action" type="button" id="enroll-face-btn" disabled>Thêm khuôn mặt nhận
+                    diện</button>
+                <button class="hero-action hero-action-light" type="button" id="switch-face-login">Quay lại Face
+                    ID</button>
                 <button class="hero-action hero-action-light" type="button" id="cancel-login">Hủy</button>
+            </div>
+        </div>
+
+        <div id="face-login-modal" class="login-modal">
+            <div class="login-box face-box">
+                <h3>Đăng nhập bằng khuôn mặt</h3>
+                <div class="face-frame">
+                    <video id="faceLoginVideo" autoplay muted playsinline></video>
+                    <canvas id="faceLoginOverlay" class="face-overlay"></canvas>
+                </div>
+                <div id="face-login-status" class="modal-hint">Mở camera và đặt khuôn mặt vào khung để xác thực.</div>
+                <button class="hero-action" type="button" id="start-face-login">Quét khuôn mặt</button>
+                <button class="hero-action hero-action-light" type="button" id="open-traditional-login">Đăng nhập truyền
+                    thống</button>
+                <button class="hero-action hero-action-light" type="button" id="cancel-face-login">Đóng</button>
+            </div>
+        </div>
+
+        <div id="face-enroll-modal" class="login-modal">
+            <div class="login-box face-box">
+                <h3>Thêm khuôn mặt nhận diện</h3>
+                <div class="face-frame">
+                    <video id="faceEnrollVideo" autoplay muted playsinline></video>
+                    <canvas id="faceEnrollOverlay" class="face-overlay"></canvas>
+                </div>
+                <div id="face-enroll-status" class="modal-hint">Đảm bảo đủ sáng, nhìn thẳng camera rồi bấm lưu khuôn
+                    mặt.</div>
+                <button class="hero-action" type="button" id="capture-face-enroll">Lưu khuôn mặt</button>
+                <button class="hero-action hero-action-light" type="button" id="close-face-enroll">Đóng</button>
             </div>
         </div>
 

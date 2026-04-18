@@ -26,8 +26,24 @@ const elements = {
     connectionStatus: document.getElementById('connectionStatus'),
     authButton: document.getElementById('auth-btn'),
     loginModal: document.getElementById('login-modal'),
+    faceLoginModal: document.getElementById('face-login-modal'),
+    faceEnrollModal: document.getElementById('face-enroll-modal'),
     cancelLogin: document.getElementById('cancel-login'),
+    cancelFaceLogin: document.getElementById('cancel-face-login'),
+    closeFaceEnroll: document.getElementById('close-face-enroll'),
     submitLogin: document.getElementById('submit-login'),
+    switchFaceLogin: document.getElementById('switch-face-login'),
+    openTraditionalLogin: document.getElementById('open-traditional-login'),
+    startFaceLogin: document.getElementById('start-face-login'),
+    enrollFaceBtn: document.getElementById('enroll-face-btn'),
+    captureFaceEnroll: document.getElementById('capture-face-enroll'),
+    traditionalLoginHint: document.getElementById('traditional-login-hint'),
+    faceLoginStatus: document.getElementById('face-login-status'),
+    faceEnrollStatus: document.getElementById('face-enroll-status'),
+    faceLoginVideo: document.getElementById('faceLoginVideo'),
+    faceEnrollVideo: document.getElementById('faceEnrollVideo'),
+    faceLoginOverlay: document.getElementById('faceLoginOverlay'),
+    faceEnrollOverlay: document.getElementById('faceEnrollOverlay'),
     email: document.getElementById('email'),
     password: document.getElementById('password'),
     temperatureValue: document.getElementById('temperatureValue'),
@@ -56,9 +72,6 @@ const elements = {
     assistantForm: document.getElementById('assistant-form'),
     assistantInput: document.getElementById('assistant-input'),
     curatorAccess: document.getElementById('curatorAccess'),
-    curatorConfidence: document.getElementById('curatorConfidence'),
-    anomalyScore: document.getElementById('anomalyScore'),
-    riskState: document.getElementById('riskState'),
     activityLog: document.getElementById('activity-log')
 };
 
@@ -192,6 +205,413 @@ const assistantState = {
     messages: []
 };
 
+const faceAuthState = {
+    modelsLoaded: false,
+    sessionActive: false,
+    activeMode: null,
+    stream: null,
+    descriptor: null,
+    label: null,
+    trackingTimer: null
+};
+
+const faceAuthConfig = {
+    modelUrl: 'https://justadudewhohacks.github.io/face-api.js/models',
+    storageKey: 'smartcity_face_descriptor_v1',
+    threshold: 0.38,
+    minSamples: 3,
+    maxSamples: 6,
+    sampleIntervalMs: 140
+};
+
+const mapZoneMeta = new Map([
+    ['floodZoneGroup', {
+        title: 'Kênh thoát nước',
+        detail: 'Theo dõi mực nước và cảnh báo ngập theo realtime từ Firebase.'
+    }],
+    ['parkingZoneGroup', {
+        title: 'Bãi đỗ xe',
+        detail: 'Hiển thị số chỗ trống để đánh giá tải giao thông khu trung tâm.'
+    }],
+    ['streetLightMarker', {
+        title: 'Đèn đường',
+        detail: 'Nhấp để xem trạng thái ON/OFF và chế độ AUTO/MANUAL của đèn.'
+    }],
+    ['pumpMarker', {
+        title: 'Máy bơm thoát nước',
+        detail: 'Thiết bị hỗ trợ chống ngập và có thể tự động điều khiển theo mực nước.'
+    }],
+    ['airQualityMarker', {
+        title: 'Trạm AQI',
+        detail: 'Giám sát chất lượng không khí của khu vực để cập nhật cảnh báo đô thị.'
+    }],
+    ['tempSensorMarker', {
+        title: 'Sensor môi trường',
+        detail: 'Cụm cảm biến nhiệt độ, độ ẩm và điều kiện môi trường tổng hợp.'
+    }],
+    ['controlCenterMarker', {
+        title: 'Trung tâm điều khiển',
+        detail: 'Điểm điều phối vận hành toàn hệ thống smart city giả lập.'
+    }]
+]);
+
+const mapDefaultFocus = {
+    title: 'Bản đồ tổng quan',
+    detail: 'Rê chuột hoặc nhấn vào khu trên bản đồ để xem chi tiết.'
+};
+
+function isAdminAuthenticated() {
+    return Boolean(auth.currentUser || faceAuthState.sessionActive);
+}
+
+function setAdminUiState() {
+    const adminControls = document.querySelectorAll('.admin-only');
+    const isAuthenticated = isAdminAuthenticated();
+
+    if (isAuthenticated) {
+        elements.authButton.textContent = 'Đăng xuất';
+        adminControls.forEach((control) => {
+            control.style.display = 'flex';
+        });
+        elements.curatorAccess.textContent = faceAuthState.sessionActive ? 'Đã xác thực Face ID' : 'Đã xác thực admin';
+    } else {
+        elements.authButton.textContent = 'Đăng nhập Face ID';
+        adminControls.forEach((control) => {
+            control.style.display = 'none';
+        });
+        elements.curatorAccess.textContent = 'Đăng nhập demo';
+    }
+}
+
+function loadFaceProfileFromStorage() {
+    try {
+        const raw = localStorage.getItem(faceAuthConfig.storageKey);
+        if (!raw) {
+            return;
+        }
+
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed?.descriptor) || !parsed.descriptor.length) {
+            return;
+        }
+
+        faceAuthState.label = parsed.label || 'admin';
+        faceAuthState.descriptor = new Float32Array(parsed.descriptor);
+    } catch (error) {
+        faceAuthState.label = null;
+        faceAuthState.descriptor = null;
+    }
+}
+
+function saveFaceProfile(label, descriptor) {
+    localStorage.setItem(faceAuthConfig.storageKey, JSON.stringify({
+        label,
+        descriptor: Array.from(descriptor)
+    }));
+
+    faceAuthState.label = label;
+    faceAuthState.descriptor = new Float32Array(descriptor);
+}
+
+async function loadFaceModels() {
+    if (faceAuthState.modelsLoaded) {
+        return;
+    }
+
+    const faceApi = window.faceapi;
+    if (!faceApi) {
+        throw new Error('face-api.js chưa tải xong');
+    }
+
+    await Promise.all([
+        faceApi.nets.tinyFaceDetector.loadFromUri(faceAuthConfig.modelUrl),
+        faceApi.nets.faceLandmark68Net.loadFromUri(faceAuthConfig.modelUrl),
+        faceApi.nets.faceRecognitionNet.loadFromUri(faceAuthConfig.modelUrl)
+    ]);
+
+    faceAuthState.modelsLoaded = true;
+}
+
+function getFaceElementsByMode(mode) {
+    if (mode === 'enroll') {
+        return {
+            video: elements.faceEnrollVideo,
+            overlay: elements.faceEnrollOverlay,
+            status: elements.faceEnrollStatus
+        };
+    }
+
+    return {
+        video: elements.faceLoginVideo,
+        overlay: elements.faceLoginOverlay,
+        status: elements.faceLoginStatus
+    };
+}
+
+function syncOverlaySize(video, canvas) {
+    const nextWidth = Math.max(1, Math.floor(video.clientWidth));
+    const nextHeight = Math.max(1, Math.floor(video.clientHeight));
+    if (canvas.width !== nextWidth || canvas.height !== nextHeight) {
+        canvas.width = nextWidth;
+        canvas.height = nextHeight;
+    }
+}
+
+function clearOverlay(canvas) {
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+function drawFocusBox(canvas, video, box) {
+    const ctx = canvas.getContext('2d');
+    clearOverlay(canvas);
+
+    if (!box || !video.videoWidth || !video.videoHeight) {
+        return;
+    }
+
+    const scaleX = canvas.width / video.videoWidth;
+    const scaleY = canvas.height / video.videoHeight;
+    const x = box.x * scaleX;
+    const y = box.y * scaleY;
+    const width = box.width * scaleX;
+    const height = box.height * scaleY;
+
+    ctx.strokeStyle = '#00d26a';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(x, y, width, height);
+
+    const corner = Math.max(12, Math.min(width, height) * 0.18);
+    ctx.beginPath();
+    ctx.moveTo(x, y + corner);
+    ctx.lineTo(x, y);
+    ctx.lineTo(x + corner, y);
+
+    ctx.moveTo(x + width - corner, y);
+    ctx.lineTo(x + width, y);
+    ctx.lineTo(x + width, y + corner);
+
+    ctx.moveTo(x + width, y + height - corner);
+    ctx.lineTo(x + width, y + height);
+    ctx.lineTo(x + width - corner, y + height);
+
+    ctx.moveTo(x + corner, y + height);
+    ctx.lineTo(x, y + height);
+    ctx.lineTo(x, y + height - corner);
+    ctx.stroke();
+}
+
+async function detectFace(videoElement, withDescriptor = false) {
+    const faceApi = window.faceapi;
+    let detection = await faceApi
+        .detectSingleFace(videoElement, new faceApi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.55 }))
+        .withFaceLandmarks();
+
+    if (detection && withDescriptor) {
+        detection = await faceApi
+            .detectSingleFace(videoElement, new faceApi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.55 }))
+            .withFaceLandmarks()
+            .withFaceDescriptor();
+    }
+
+    return detection;
+}
+
+function stopFaceTracking() {
+    if (faceAuthState.trackingTimer) {
+        clearTimeout(faceAuthState.trackingTimer);
+        faceAuthState.trackingTimer = null;
+    }
+
+    clearOverlay(elements.faceLoginOverlay);
+    clearOverlay(elements.faceEnrollOverlay);
+}
+
+async function startFaceTracking(mode) {
+    stopFaceTracking();
+
+    const run = async () => {
+        if (faceAuthState.activeMode !== mode) {
+            return;
+        }
+
+        const { video, overlay, status } = getFaceElementsByMode(mode);
+        if (!video || !overlay || !video.videoWidth) {
+            faceAuthState.trackingTimer = setTimeout(run, 120);
+            return;
+        }
+
+        syncOverlaySize(video, overlay);
+        const detection = await detectFace(video, false);
+        if (detection?.detection?.box) {
+            drawFocusBox(overlay, video, detection.detection.box);
+            if (status.textContent.includes('khung')) {
+                status.textContent = 'Đã bắt được khuôn mặt. Bạn có thể tiến hành xác thực.';
+            }
+        } else {
+            clearOverlay(overlay);
+        }
+
+        faceAuthState.trackingTimer = setTimeout(run, 120);
+    };
+
+    await run();
+}
+
+function averageDescriptors(descriptors) {
+    const length = descriptors[0].length;
+    const avg = new Float32Array(length);
+
+    for (let i = 0; i < length; i += 1) {
+        let sum = 0;
+        descriptors.forEach((descriptor) => {
+            sum += descriptor[i];
+        });
+        avg[i] = sum / descriptors.length;
+    }
+
+    return avg;
+}
+
+function wait(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function captureStableDescriptor(videoElement) {
+    const samples = [];
+
+    for (let i = 0; i < faceAuthConfig.maxSamples; i += 1) {
+        const detection = await detectFace(videoElement, true);
+        if (detection?.descriptor && detection?.detection?.score >= 0.72) {
+            samples.push(detection.descriptor);
+        }
+
+        if (samples.length >= faceAuthConfig.minSamples) {
+            break;
+        }
+
+        await wait(faceAuthConfig.sampleIntervalMs);
+    }
+
+    if (samples.length < faceAuthConfig.minSamples) {
+        return null;
+    }
+
+    return averageDescriptors(samples);
+}
+
+async function startFaceCamera(mode) {
+    const target = mode === 'enroll' ? elements.faceEnrollVideo : elements.faceLoginVideo;
+
+    if (!faceAuthState.stream) {
+        faceAuthState.stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+            audio: false
+        });
+    }
+
+    faceAuthState.activeMode = mode;
+    target.srcObject = faceAuthState.stream;
+    await target.play();
+    await startFaceTracking(mode);
+}
+
+function stopFaceCamera() {
+    stopFaceTracking();
+
+    if (faceAuthState.stream) {
+        faceAuthState.stream.getTracks().forEach((track) => track.stop());
+    }
+
+    faceAuthState.stream = null;
+    faceAuthState.activeMode = null;
+    elements.faceLoginVideo.srcObject = null;
+    elements.faceEnrollVideo.srcObject = null;
+}
+
+async function openFaceLoginModal(show) {
+    elements.faceLoginModal.style.display = show ? 'flex' : 'none';
+    if (!show) {
+        stopFaceCamera();
+        return;
+    }
+
+    elements.faceLoginStatus.textContent = 'Đang khởi tạo Face ID...';
+    try {
+        await loadFaceModels();
+        await startFaceCamera('login');
+        if (faceAuthState.descriptor) {
+            elements.faceLoginStatus.textContent = 'Mời đặt khuôn mặt vào khung và bấm Quét khuôn mặt.';
+        } else {
+            elements.faceLoginStatus.textContent = 'Chưa có khuôn mặt mẫu. Hãy dùng đăng nhập truyền thống để thêm khuôn mặt.';
+        }
+    } catch (error) {
+        elements.faceLoginStatus.textContent = 'Không thể mở camera hoặc tải model Face ID.';
+    }
+}
+
+async function openFaceEnrollModal(show) {
+    elements.faceEnrollModal.style.display = show ? 'flex' : 'none';
+    if (!show) {
+        stopFaceCamera();
+        return;
+    }
+
+    elements.faceEnrollStatus.textContent = 'Đang khởi tạo camera để thêm khuôn mặt...';
+    try {
+        await loadFaceModels();
+        await startFaceCamera('enroll');
+        elements.faceEnrollStatus.textContent = 'Đặt khuôn mặt vào giữa khung rồi bấm Lưu khuôn mặt.';
+    } catch (error) {
+        elements.faceEnrollStatus.textContent = 'Không thể mở camera để thêm khuôn mặt.';
+    }
+}
+
+async function verifyFaceLogin() {
+    if (!faceAuthState.descriptor) {
+        elements.faceLoginStatus.textContent = 'Chưa có khuôn mặt mẫu. Hãy đăng nhập truyền thống để thêm khuôn mặt.';
+        return;
+    }
+
+    elements.faceLoginStatus.textContent = 'Đang nhận diện...';
+    const descriptor = await captureStableDescriptor(elements.faceLoginVideo);
+    if (!descriptor) {
+        elements.faceLoginStatus.textContent = 'Không lấy đủ mẫu khuôn mặt rõ nét. Vui lòng giữ yên mặt và thử lại.';
+        return;
+    }
+
+    const distance = window.faceapi.euclideanDistance(descriptor, faceAuthState.descriptor);
+    if (distance <= faceAuthConfig.threshold) {
+        faceAuthState.sessionActive = true;
+        setAdminUiState();
+        elements.faceLoginStatus.textContent = 'Xác thực thành công.';
+        appendLog('Đăng nhập Face ID thành công');
+        window.setTimeout(() => {
+            openFaceLoginModal(false);
+        }, 350);
+    } else {
+        elements.faceLoginStatus.textContent = `Khuôn mặt không khớp mẫu đã đăng ký (độ lệch: ${distance.toFixed(3)}).`;
+    }
+}
+
+async function enrollCurrentFace() {
+    if (!auth.currentUser) {
+        elements.faceEnrollStatus.textContent = 'Cần đăng nhập truyền thống trước khi thêm khuôn mặt.';
+        return;
+    }
+
+    elements.faceEnrollStatus.textContent = 'Đang trích xuất đặc trưng khuôn mặt...';
+    const descriptor = await captureStableDescriptor(elements.faceEnrollVideo);
+    if (!descriptor) {
+        elements.faceEnrollStatus.textContent = 'Không lấy đủ mẫu khuôn mặt rõ nét. Hãy thử lại ở nơi đủ sáng và giữ mặt ổn định.';
+        return;
+    }
+
+    saveFaceProfile(auth.currentUser.email || 'admin', descriptor);
+    elements.faceEnrollStatus.textContent = 'Đã lưu khuôn mặt nhận diện thành công.';
+    appendLog('Admin đã cập nhật khuôn mặt nhận diện Face ID');
+}
+
 function normalizeNumber(value, digits = 1) {
     if (value === null || value === undefined || value === '') {
         return null;
@@ -314,9 +734,114 @@ function getFloodLabel(waterLevel) {
     return 'an toàn';
 }
 
+function setMapZoneState(element, state) {
+    if (!element) {
+        return;
+    }
+    element.classList.remove('is-safe', 'is-watch', 'is-danger', 'is-on', 'is-off');
+    if (state) {
+        element.classList.add(state);
+    }
+}
+
+function clearMapSelection() {
+    document.querySelectorAll('.map-zone.is-selected').forEach((zone) => {
+        zone.classList.remove('is-selected');
+    });
+}
+
+function setMapFocus(zoneId) {
+    const meta = mapZoneMeta.get(zoneId) || mapDefaultFocus;
+    if (elements.mapFocusTitle) {
+        elements.mapFocusTitle.textContent = meta.title;
+    }
+    if (elements.mapFocusDetail) {
+        elements.mapFocusDetail.textContent = meta.detail;
+    }
+}
+
+function bindMapInteractions() {
+    mapZoneMeta.forEach((_, zoneId) => {
+        const zone = elements[zoneId];
+        if (!zone) {
+            return;
+        }
+
+        zone.setAttribute('tabindex', '0');
+        zone.addEventListener('mouseenter', () => setMapFocus(zoneId));
+        zone.addEventListener('focus', () => setMapFocus(zoneId));
+        zone.addEventListener('click', () => {
+            clearMapSelection();
+            zone.classList.add('is-selected');
+            setMapFocus(zoneId);
+        });
+    });
+}
+
+function updateCityMap(temperature, parking, waterLevel, airQuality, lightLevel, devices, modes) {
+    if (!elements.floodZoneGroup) {
+        return;
+    }
+
+    const floodLabel = getFloodLabel(waterLevel);
+    const streetLightAuto = normalizeMode(modes.street_light_auto, true);
+    const pumpAuto = normalizeMode(modes.pump_auto, true);
+    const streetLightState = String(devices.street_light ?? 'OFF').toUpperCase();
+    const pumpState = String(devices.water_pump ?? 'OFF').toUpperCase();
+    const floodStateClass = floodLabel === 'an toàn' ? 'is-safe' : floodLabel === 'cảnh báo ngập' ? 'is-watch' : 'is-danger';
+    const parkingStatus = parking === null ? 'Đang chờ' : parking <= 0 ? 'Hết chỗ' : `${parking} chỗ trống`;
+
+    if (elements.mapFloodStatus) {
+        elements.mapFloodStatus.textContent = floodLabel === 'an toàn' ? 'An toàn' : floodLabel === 'cảnh báo ngập' ? 'Cảnh báo' : 'Ngập cao';
+    }
+    if (elements.mapStreetLightStatus) {
+        elements.mapStreetLightStatus.textContent = `${streetLightState} / ${streetLightAuto ? 'AUTO' : 'MANUAL'}`;
+    }
+    if (elements.mapPumpStatus) {
+        elements.mapPumpStatus.textContent = `${pumpState} / ${pumpAuto ? 'AUTO' : 'MANUAL'}`;
+    }
+    if (elements.mapAirQualityStatus) {
+        elements.mapAirQualityStatus.textContent = airQuality === null ? '--' : String(airQuality);
+    }
+    if (elements.parkingZoneLabel) {
+        elements.parkingZoneLabel.textContent = parkingStatus;
+    }
+    if (elements.floodZoneLabel) {
+        elements.floodZoneLabel.textContent = waterLevel === null ? 'Mực nước: --%' : `Mực nước: ${waterLevel}%`;
+    }
+
+    setMapZoneState(elements.floodZoneGroup, floodStateClass);
+    setMapZoneState(elements.parkingZoneGroup, parking !== null && parking <= 0 ? 'is-danger' : parking !== null && parking <= 4 ? 'is-watch' : 'is-safe');
+    setMapZoneState(elements.streetLightMarker, streetLightState === 'ON' ? 'is-on' : 'is-off');
+    setMapZoneState(elements.pumpMarker, pumpState === 'ON' ? 'is-on' : 'is-off');
+    setMapZoneState(elements.airQualityMarker, airQuality === null ? 'is-safe' : airQuality >= 80 ? 'is-danger' : airQuality >= 55 ? 'is-watch' : 'is-safe');
+    setMapZoneState(elements.tempSensorMarker, temperature !== null && temperature > 35 ? 'is-danger' : 'is-safe');
+    setMapZoneState(elements.controlCenterMarker, lightLevel !== null && lightLevel < 20 ? 'is-watch' : 'is-safe');
+
+    if (!document.querySelector('.map-zone.is-selected')) {
+        setMapFocus('');
+    }
+}
+
 function buildAssistantReply(question) {
     const text = question.toLowerCase();
+    const trimmed = text.trim();
     const snap = assistantState.lastSnapshot;
+    const greetingPattern = /(^|\s)(xin chào|xin chao|chào|chao|hello|hi|hey)(\s|$|[.!?,])/i;
+
+    // Only treat as greeting when it is actually a short greeting phrase.
+    if (greetingPattern.test(trimmed) && trimmed.length <= 40) {
+        return 'Chào bạn, mình vẫn theo dõi dashboard đô thị cho bạn, nhưng cũng có thể trò chuyện tự do về học tập, công nghệ hoặc ý tưởng dự án.';
+    }
+
+    if (
+        text.includes('ai là ai') ||
+        text.includes('bạn là ai') ||
+        text.includes('làm được gì') ||
+        text.includes('giúp gì')
+    ) {
+        return 'Mình là trợ lý AI trong dashboard này: vừa hỗ trợ dữ liệu smart city theo thời gian thực, vừa có thể trao đổi các chủ đề ngoài lề theo kiểu chat tự nhiên.';
+    }
 
     if (text.includes('ngập') || text.includes('nước')) {
         return `Mực nước hiện tại là ${snap.waterLevel ?? '--'}%. Trạng thái: ${getFloodLabel(snap.waterLevel)}.`;
@@ -342,19 +867,22 @@ function buildAssistantReply(question) {
         return `Bãi đỗ xe hiện còn ${snap.parking ?? '--'} chỗ trống.`;
     }
 
-    return `Mình đang theo dõi các chỉ số: nhiệt độ ${snap.temperature ?? '--'}°C, độ ẩm ${snap.humidity ?? '--'}%, bãi xe ${snap.parking ?? '--'} chỗ, mực nước ${snap.waterLevel ?? '--'}%. Bạn có thể hỏi: ngập, đèn đường, máy bơm, không khí hoặc bãi đỗ xe.`;
+    return `Mình hiểu câu hỏi của bạn về "${question.trim()}". Nếu bạn muốn trao đổi ngoài lề, cứ nói rõ chủ đề (ví dụ học tập, code, công nghệ, ý tưởng dự án), mình sẽ trả lời tự nhiên; còn nếu liên quan smart city thì mình sẽ bám theo dữ liệu realtime hiện có.`;
 }
 
 function buildAssistantSystemPrompt() {
     const snap = assistantState.lastSnapshot;
     return [
         'Bạn là AI Assist cho dashboard smart city bằng tiếng Việt.',
-        'Trả lời ngắn gọn, tự nhiên, đúng trọng tâm, tối đa 4 câu trừ khi người dùng yêu cầu chi tiết.',
-        'Bám theo ngữ cảnh sensor và trạng thái thiết bị hiện tại.',
+        'Trả lời tự nhiên, thân thiện, đúng trọng tâm; mặc định 3-6 câu và có thể dài hơn khi người dùng yêu cầu.',
+        'Bạn được phép trao đổi cả chủ đề ngoài lề (học tập, công nghệ, đời sống, ý tưởng...) thay vì chỉ giới hạn ở smart city.',
+        'Khi câu hỏi liên quan dashboard thì ưu tiên dùng ngữ cảnh sensor và trạng thái thiết bị hiện tại.',
+        'Khi câu hỏi không liên quan dashboard, vẫn trả lời bình thường như một trợ lý AI đa năng.',
         `Ngữ cảnh: nhiệt độ ${snap.temperature ?? '--'}°C, độ ẩm ${snap.humidity ?? '--'}%, bãi xe ${snap.parking ?? '--'} chỗ, mực nước ${snap.waterLevel ?? '--'}%, AQI ${snap.airQuality ?? '--'}, ánh sáng ${snap.lightLevel ?? '--'}%.`,
         `Đèn đường: ${snap.streetLightState}, chế độ ${snap.streetLightAuto ? 'AUTO' : 'MANUAL'}.`,
         `Máy bơm: ${snap.waterPumpState}, chế độ ${snap.pumpAuto ? 'AUTO' : 'MANUAL'}.`,
-        'Nếu không chắc, hãy nói rõ là cần thêm dữ liệu thay vì bịa.'
+        'Không tự nhận có hành động ngoài phạm vi chat (không giả vờ đã điều khiển thiết bị).',
+        'Nếu không chắc, hãy nói rõ giới hạn thay vì bịa thông tin.'
     ].join(' ');
 }
 
@@ -372,7 +900,7 @@ async function requestAssistantReply(question) {
                 ...assistantState.messages,
                 { role: 'user', content: question }
             ],
-            temperature: 0.35,
+            temperature: 0.7,
             max_tokens: 220
         })
     });
@@ -418,26 +946,13 @@ async function sendAssistantQuestion(question) {
 }
 
 function updateAiSummary(temperature, humidity, parking, waterLevel, airQuality, lightLevel) {
-    const tempValue = normalizeNumber(temperature);
-    const humidityValue = normalizeNumber(humidity);
-    const parkingValue = normalizeNumber(parking, 0);
     const waterValue = normalizeNumber(waterLevel, 0);
     const airValue = normalizeNumber(airQuality, 0);
     const lightValue = normalizeNumber(lightLevel, 0);
 
-    const tempRisk = tempValue === null ? 0 : Math.max(0, (tempValue - 25) * 4);
-    const humidityRisk = humidityValue === null ? 0 : Math.max(0, Math.abs(humidityValue - 65) * 1.3);
-    const parkingRisk = parkingValue === null ? 0 : Math.max(0, 20 - parkingValue) * 2.0;
-    const floodRisk = waterValue === null ? 0 : Math.max(0, waterValue - 45) * 1.5;
-    const airRisk = airValue === null ? 0 : Math.max(0, airValue - 50) * 1.1;
-    const anomaly = Math.min(100, Math.round(tempRisk + humidityRisk + parkingRisk + floodRisk + airRisk));
-    const confidence = Math.max(0, 100 - anomaly);
     const riskLabel = waterValue === null ? 'AN TOÀN' : (waterValue >= 75 ? 'NGẬP CAO' : waterValue >= 45 ? 'CẢNH BÁO' : 'AN TOÀN');
 
-    elements.curatorConfidence.textContent = `${confidence}%`;
-    elements.anomalyScore.textContent = `${anomaly.toFixed(1)}%`;
-    elements.riskState.textContent = anomaly >= 60 ? 'Cảnh báo' : anomaly >= 30 ? 'Theo dõi' : 'Ổn định';
-    elements.curatorAccess.textContent = auth.currentUser ? 'Đã xác thực admin' : 'Đăng nhập demo';
+    elements.curatorAccess.textContent = isAdminAuthenticated() ? 'Đã xác thực admin' : 'Đăng nhập demo';
 
     elements.waterLevelValue.textContent = waterValue === null ? '--' : `${waterValue}`;
     elements.floodRiskBadge.textContent = riskLabel;
@@ -515,6 +1030,7 @@ function updateDashboard(snapshotValue, options = { updateChart: true }) {
     elements.waterPumpHint.textContent = pumpAuto ? 'AUTO theo mực nước' : 'MANUAL từ dashboard';
 
     updateAssistantSnapshotFromDashboard();
+    updateCityMap(temperature, parking, waterLevel, airQuality, lightLevel, devices, modes);
 
     if (options.updateChart && temperature !== null && humidity !== null && parking !== null && waterLevel !== null) {
         updateChart(temperature, humidity, parking, waterLevel);
@@ -573,21 +1089,17 @@ onValue(logsRef, (snapshot) => {
 });
 
 onAuthStateChanged(auth, (user) => {
-    const adminControls = document.querySelectorAll('.admin-only');
-    if (user) {
-        elements.authButton.textContent = 'Đăng xuất';
-        adminControls.forEach((control) => {
-            control.style.display = 'flex';
-        });
-        elements.loginModal.style.display = 'none';
-        elements.curatorAccess.textContent = 'Đã xác thực admin';
+    if (!user) {
+        elements.enrollFaceBtn.disabled = true;
+        if (!faceAuthState.sessionActive) {
+            elements.traditionalLoginHint.textContent = 'Dùng tài khoản truyền thống để thêm/cập nhật khuôn mặt nhận diện.';
+        }
     } else {
-        elements.authButton.textContent = 'Đăng nhập Admin';
-        adminControls.forEach((control) => {
-            control.style.display = 'none';
-        });
-        elements.curatorAccess.textContent = 'Đăng nhập demo';
+        elements.enrollFaceBtn.disabled = false;
+        elements.traditionalLoginHint.textContent = 'Đăng nhập truyền thống thành công. Bạn có thể thêm khuôn mặt nhận diện.';
     }
+
+    setAdminUiState();
 });
 
 async function handleLogin() {
@@ -596,9 +1108,8 @@ async function handleLogin() {
 
     try {
         await signInWithEmailAndPassword(auth, email, password);
-        elements.loginModal.style.display = 'none';
-        elements.email.value = '';
-        elements.password.value = '';
+        elements.enrollFaceBtn.disabled = false;
+        elements.traditionalLoginHint.textContent = 'Đăng nhập truyền thống thành công. Hãy bấm Thêm khuôn mặt nhận diện.';
     } catch (error) {
         alert('Sai tài khoản hoặc mật khẩu');
     }
@@ -608,21 +1119,62 @@ function toggleLoginModal(show) {
     elements.loginModal.style.display = show ? 'flex' : 'none';
 }
 
-elements.authButton.addEventListener('click', () => {
-    if (auth.currentUser) {
-        signOut(auth);
+elements.authButton.addEventListener('click', async () => {
+    if (isAdminAuthenticated()) {
+        faceAuthState.sessionActive = false;
+        if (auth.currentUser) {
+            await signOut(auth);
+        }
+        setAdminUiState();
+        appendLog('Admin đã đăng xuất');
         return;
     }
 
-    toggleLoginModal(true);
+    openFaceLoginModal(true);
 });
 
 elements.cancelLogin.addEventListener('click', () => toggleLoginModal(false));
 elements.submitLogin.addEventListener('click', handleLogin);
+elements.switchFaceLogin.addEventListener('click', async () => {
+    toggleLoginModal(false);
+    await openFaceLoginModal(true);
+});
+elements.openTraditionalLogin.addEventListener('click', async () => {
+    await openFaceLoginModal(false);
+    toggleLoginModal(true);
+});
+elements.cancelFaceLogin.addEventListener('click', async () => {
+    await openFaceLoginModal(false);
+});
+elements.startFaceLogin.addEventListener('click', verifyFaceLogin);
+elements.enrollFaceBtn.addEventListener('click', async () => {
+    if (!auth.currentUser) {
+        alert('Bạn cần đăng nhập truyền thống trước khi thêm khuôn mặt.');
+        return;
+    }
+
+    await openFaceEnrollModal(true);
+});
+elements.captureFaceEnroll.addEventListener('click', enrollCurrentFace);
+elements.closeFaceEnroll.addEventListener('click', async () => {
+    await openFaceEnrollModal(false);
+});
 
 elements.loginModal.addEventListener('click', (event) => {
     if (event.target === elements.loginModal) {
         toggleLoginModal(false);
+    }
+});
+
+elements.faceLoginModal.addEventListener('click', async (event) => {
+    if (event.target === elements.faceLoginModal) {
+        await openFaceLoginModal(false);
+    }
+});
+
+elements.faceEnrollModal.addEventListener('click', async (event) => {
+    if (event.target === elements.faceEnrollModal) {
+        await openFaceEnrollModal(false);
     }
 });
 
@@ -649,9 +1201,9 @@ document.querySelectorAll('.assistant-chip').forEach((chip) => {
 });
 
 window.controlDevice = async (device, status) => {
-    if (!auth.currentUser) {
+    if (!isAdminAuthenticated()) {
         alert('Bạn cần đăng nhập Admin để điều khiển.');
-        toggleLoginModal(true);
+        openFaceLoginModal(true);
         return;
     }
 
@@ -675,9 +1227,9 @@ window.toggleDevice = async (device) => {
 };
 
 window.toggleMode = async (modeKey) => {
-    if (!auth.currentUser) {
+    if (!isAdminAuthenticated()) {
         alert('Bạn cần đăng nhập Admin để đổi chế độ AUTO/MANUAL.');
-        toggleLoginModal(true);
+        openFaceLoginModal(true);
         return;
     }
 
@@ -687,3 +1239,7 @@ window.toggleMode = async (modeKey) => {
     const modeName = modeKey === 'street_light_auto' ? 'Đèn đường' : 'Máy bơm';
     appendLog(`Admin chuyển ${modeName} sang ${!current ? 'AUTO' : 'MANUAL'}`);
 };
+
+loadFaceProfileFromStorage();
+bindMapInteractions();
+setAdminUiState();
