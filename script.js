@@ -14,7 +14,7 @@ const firebaseConfig = {
 };
 
 const groqConfig = {
-    apiKey: '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',
+    apiKey: '',
     model: 'llama-3.1-70b-versatile'
 };
 
