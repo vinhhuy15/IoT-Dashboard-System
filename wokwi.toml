@@ -1,0 +1,4 @@
+[wokwi]
+version = 1
+elf = "IOT_WOKWI/.pio/build/esp32doit-devkit-v1/firmware.elf"
+firmware = "IOT_WOKWI/.pio/build/esp32doit-devkit-v1/firmware.bin"

@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		},
+		{
+			"name": "iot-simulator",
+			"path": "../iot-simulator"
+		}
+	],
+	"settings": {
+		"liveServer.settings.multiRootWorkspaceName": "project-final"
+	}
+}

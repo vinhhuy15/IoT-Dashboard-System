@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "author": "HCMUTE CE Student",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    { "type": "wokwi-dht22", "id": "dht", "top": -100, "left": -150, "attrs": {} },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btnIn",
+      "top": -51.4,
+      "left": 144,
+      "attrs": { "color": "green", "label": "IN" }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btnOut",
+      "top": 50,
+      "left": 150,
+      "attrs": { "color": "red", "label": "OUT" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led",
+      "top": 284.4,
+      "left": 61.4,
+      "attrs": { "color": "yellow" }
+    },
+    { "type": "wokwi-relay-module", "id": "relay", "top": 269, "left": 163.2, "attrs": {} }
+  ],
+  "connections": [
+    [ "esp:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX", "$serialMonitor:TX", "", [] ],
+    [ "dht:VCC", "esp:3V3", "red", [ "v0" ] ],
+    [ "dht:GND", "esp:GND.1", "black", [ "v0" ] ],
+    [ "dht:SDA", "esp:15", "green", [ "v0" ] ],
+    [ "btnIn:1.l", "esp:GND.2", "black", [ "h-15.6", "v65.8" ] ],
+    [ "btnIn:2.l", "esp:12", "blue", [ "v0" ] ],
+    [ "btnOut:1.l", "esp:GND.2", "black", [ "v0" ] ],
+    [ "btnOut:2.l", "esp:14", "blue", [ "v0" ] ],
+    [ "led:A", "esp:2", "yellow", [ "v0" ] ],
+    [ "led:C", "esp:GND.3", "black", [ "v0" ] ],
+    [ "relay:VCC", "esp:5V", "red", [ "v0" ] ],
+    [ "relay:GND", "esp:GND.2", "black", [ "v0" ] ],
+    [ "relay:IN", "esp:4", "purple", [ "v0" ] ]
+  ],
+  "dependencies": {}
+}

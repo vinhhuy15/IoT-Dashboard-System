@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"name": "IOT_WOKWI",
+			"path": "IOT_WOKWI"
+		}
+	],
+	"settings": {
+		"liveServer.settings.multiRootWorkspaceName": "bai_nop_firebase"
+	}
+}

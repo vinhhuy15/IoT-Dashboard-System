@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HCMUTE Smart City Control Center</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="page-shell">
+        <header class="header-container">
+            <div class="title-section">
+                <img src="logo.png" class="logo" alt="HCMUTE">
+                <div>
+                    <h1>Smart City Dashboard</h1>
+                    <p class="subtitle">Hệ thống Giám sát IoT</p>
+                </div>
+            </div>
+            <div class="header-controls">
+                <div class="status-pill" id="connectionStatus">Đang kết nối Firebase...</div>
+                <div class="status-pill status-live" id="pageMode">Chế độ: Realtime</div>
+            </div>
+        </header>
+
+        <main class="dashboard-grid">
+            <div class="card">
+                <div class="card-head">
+                    <h3>🌤️ Môi Trường</h3>
+                    <span class="mini-label">Realtime</span>
+                </div>
+                <span class="data-val temp" id="temperatureValue">--</span>
+                <small class="unit-label">°C</small>
+                <hr class="divider">
+                <span class="data-val humi" id="humidityValue">--</span>
+                <small class="unit-label">%</small>
+            </div>
+
+            <div class="card">
+                <div class="card-head">
+                    <h3>🅿️ Bãi Đỗ Xe</h3>
+                    <span class="mini-label">RTDB</span>
+                </div>
+                <span class="data-val parking" id="parkingValue">--</span>
+                <small class="unit-label">Chỗ trống</small>
+                <div class="parking-status" id="parkingStatus">Đang chờ dữ liệu</div>
+            </div>
+
+            <div class="card">
+                <div class="card-head">
+                    <h3>💡 Đèn Báo Hiệu</h3>
+                    <span class="mini-label">smartcity/devices</span>
+                </div>
+                <p>Trạng thái: <strong id="streetLightState" class="device-off">--</strong></p>
+                <div class="device-meta" id="streetLightMeta">Chưa có dữ liệu</div>
+            </div>
+
+            <div class="card">
+                <div class="card-head">
+                    <h3>🌊 Hệ thống thoát nước</h3>
+                    <span class="mini-label">smartcity/devices</span>
+                </div>
+                <p>Trạng thái: <strong id="waterPumpState" class="device-off">--</strong></p>
+                <div class="device-meta" id="waterPumpMeta">Chưa có dữ liệu</div>
+            </div>
+        </main>
+
+        <section class="bottom-section">
+            <div class="info-container">
+                <h3>Tổng quan hệ thống</h3>
+                <p id="overviewText">Bảng điều khiển sẽ tự cập nhật dữ liệu khi ESP32 ghi lên Firebase.</p>
+                <p id="lastUpdateText">Chưa có bản ghi nào được tải.</p>
+            </div>
+            <div class="log-container">
+                <h3>📌 Ghi chú</h3>
+                <div class="log-item" id="logTemperature">Nhiệt độ: --</div>
+                <div class="log-item" id="logHumidity">Độ ẩm: --</div>
+                <div class="log-item" id="logParking">Parking: --</div>
+                <div class="log-item" id="logDevices">Thiết bị: --</div>
+            </div>
+        </section>
+        <footer class="authors-footer">
+            <b>Giang Vĩnh Huy</b> <span style="color: #00d2ff;">(23119146)</span>
+            <span style="margin: 0 15px; opacity: 0.3;">|</span>
+            <b>Nguyễn Quang Nhơn</b> <span style="color: #00d2ff;">(23119184)</span>
+        </footer>
+    </div>
+    <script type="module" src="script.js"></script>
+</body>
+
+</html>
