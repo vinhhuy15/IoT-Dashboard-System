@@ -3,46 +3,276 @@
   "author": "HCMUTE CE Student",
   "editor": "wokwi",
   "parts": [
-    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": 0, "attrs": {} },
-    { "type": "wokwi-dht22", "id": "dht", "top": -100, "left": -150, "attrs": {} },
+    {
+      "type": "board-esp32-devkit-c-v4",
+      "id": "esp",
+      "top": 0,
+      "left": 0,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-dht22",
+      "id": "dht",
+      "top": -130,
+      "left": -150,
+      "attrs": {
+        "temperature": "24",
+        "humidity": "65",
+        "label": "ENV SENSOR"
+      }
+    },
     {
       "type": "wokwi-pushbutton",
       "id": "btnIn",
-      "top": -51.4,
-      "left": 144,
-      "attrs": { "color": "green", "label": "IN" }
+      "top": -92,
+      "left": 176,
+      "attrs": {
+        "color": "green",
+        "label": "PARK IN"
+      }
     },
     {
       "type": "wokwi-pushbutton",
       "id": "btnOut",
-      "top": 50,
-      "left": 150,
-      "attrs": { "color": "red", "label": "OUT" }
+      "top": 16,
+      "left": 176,
+      "attrs": {
+        "color": "red",
+        "label": "PARK OUT"
+      }
     },
     {
       "type": "wokwi-led",
       "id": "led",
-      "top": 284.4,
-      "left": 61.4,
-      "attrs": { "color": "yellow" }
+      "top": 280,
+      "left": 52,
+      "attrs": {
+        "color": "yellow",
+        "label": "STREET LAMP"
+      }
     },
-    { "type": "wokwi-relay-module", "id": "relay", "top": 269, "left": 163.2, "attrs": {} }
+    {
+      "type": "wokwi-relay-module",
+      "id": "relay",
+      "top": 268,
+      "left": 186,
+      "attrs": {
+        "label": "DRAIN PUMP"
+      }
+    },
+    {
+      "type": "wokwi-potentiometer",
+      "id": "potWater",
+      "top": -134,
+      "left": -300,
+      "attrs": {
+        "value": "70",
+        "label": "WATER LEVEL"
+      }
+    },
+    {
+      "type": "wokwi-potentiometer",
+      "id": "potAir",
+      "top": -24,
+      "left": -300,
+      "attrs": {
+        "value": "45",
+        "label": "AIR QUALITY"
+      }
+    },
+    {
+      "type": "wokwi-potentiometer",
+      "id": "potLight",
+      "top": 86,
+      "left": -300,
+      "attrs": {
+        "value": "35",
+        "label": "LIGHT LEVEL"
+      }
+    }
   ],
   "connections": [
-    [ "esp:TX", "$serialMonitor:RX", "", [] ],
-    [ "esp:RX", "$serialMonitor:TX", "", [] ],
-    [ "dht:VCC", "esp:3V3", "red", [ "v0" ] ],
-    [ "dht:GND", "esp:GND.1", "black", [ "v0" ] ],
-    [ "dht:SDA", "esp:15", "green", [ "v0" ] ],
-    [ "btnIn:1.l", "esp:GND.2", "black", [ "h-15.6", "v65.8" ] ],
-    [ "btnIn:2.l", "esp:12", "blue", [ "v0" ] ],
-    [ "btnOut:1.l", "esp:GND.2", "black", [ "v0" ] ],
-    [ "btnOut:2.l", "esp:14", "blue", [ "v0" ] ],
-    [ "led:A", "esp:2", "yellow", [ "v0" ] ],
-    [ "led:C", "esp:GND.3", "black", [ "v0" ] ],
-    [ "relay:VCC", "esp:5V", "red", [ "v0" ] ],
-    [ "relay:GND", "esp:GND.2", "black", [ "v0" ] ],
-    [ "relay:IN", "esp:4", "purple", [ "v0" ] ]
+    [
+      "esp:TX",
+      "$serialMonitor:RX",
+      "",
+      []
+    ],
+    [
+      "esp:RX",
+      "$serialMonitor:TX",
+      "",
+      []
+    ],
+    [
+      "dht:VCC",
+      "esp:3V3",
+      "red",
+      [
+        "v0"
+      ]
+    ],
+    [
+      "dht:GND",
+      "esp:GND.1",
+      "black",
+      [
+        "v0"
+      ]
+    ],
+    [
+      "dht:SDA",
+      "esp:15",
+      "green",
+      [
+        "v0"
+      ]
+    ],
+    [
+      "btnIn:1.l",
+      "esp:GND.2",
+      "black",
+      [
+        "h-15.6",
+        "v65.8"
+      ]
+    ],
+    [
+      "btnIn:2.l",
+      "esp:12",
+      "blue",
+      [
+        "v0"
+      ]
+    ],
+    [
+      "btnOut:1.l",
+      "esp:GND.2",
+      "black",
+      [
+        "v0"
+      ]
+    ],
+    [
+      "btnOut:2.l",
+      "esp:14",
+      "blue",
+      [
+        "v0"
+      ]
+    ],
+    [
+      "led:A",
+      "esp:2",
+      "yellow",
+      [
+        "v0"
+      ]
+    ],
+    [
+      "led:C",
+      "esp:GND.3",
+      "black",
+      [
+        "v0"
+      ]
+    ],
+    [
+      "relay:VCC",
+      "esp:5V",
+      "red",
+      [
+        "v0"
+      ]
+    ],
+    [
+      "relay:GND",
+      "esp:GND.2",
+      "black",
+      [
+        "v0"
+      ]
+    ],
+    [
+      "relay:IN",
+      "esp:4",
+      "purple",
+      [
+        "v0"
+      ]
+    ],
+    [
+      "potWater:VCC",
+      "esp:3V3",
+      "red",
+      [
+        "v0"
+      ]
+    ],
+    [
+      "potWater:GND",
+      "esp:GND.1",
+      "black",
+      [
+        "v0"
+      ]
+    ],
+    [
+      "potWater:SIG",
+      "esp:34",
+      "orange",
+      [
+        "v0"
+      ]
+    ],
+    [
+      "potAir:VCC",
+      "esp:3V3",
+      "red",
+      [
+        "v0"
+      ]
+    ],
+    [
+      "potAir:GND",
+      "esp:GND.1",
+      "black",
+      [
+        "v0"
+      ]
+    ],
+    [
+      "potAir:SIG",
+      "esp:35",
+      "orange",
+      [
+        "v0"
+      ]
+    ],
+    [
+      "potLight:VCC",
+      "esp:3V3",
+      "red",
+      [
+        "v0"
+      ]
+    ],
+    [
+      "potLight:GND",
+      "esp:GND.1",
+      "black",
+      [
+        "v0"
+      ]
+    ],
+    [
+      "potLight:SIG",
+      "esp:32",
+      "orange",
+      [
+        "v0"
+      ]
+    ]
   ],
   "dependencies": {}
 }

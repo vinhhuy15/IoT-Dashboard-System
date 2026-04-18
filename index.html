@@ -4,89 +4,177 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HCMUTE Smart City Control Center</title>
+    <title>Smart City Dashboard</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;700&family=Anton&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
 <body>
     <div class="page-shell">
-        <header class="header-container">
-            <div class="title-section">
-                <img src="logo.png" class="logo" alt="HCMUTE">
-                <div>
-                    <h1>Smart City Dashboard</h1>
-                    <p class="subtitle">Hệ thống Giám sát IoT</p>
-                </div>
+        <header class="hero">
+            <div class="hero-copy">
+                <div class="eyebrow">SMART CITY MONITORING PLATFORM</div>
+                <h1>SMART CITY DASHBOARD</h1>
+                <p>ESP32 + Firebase + Realtime Sensors + Remote Control</p>
             </div>
-            <div class="header-controls">
-                <div class="status-pill" id="connectionStatus">Đang kết nối Firebase...</div>
-                <div class="status-pill status-live" id="pageMode">Chế độ: Realtime</div>
+            <div class="hero-status-wrap">
+                <div id="connectionStatus" class="hero-status">Firebase: Đang kết nối...</div>
+                <button id="auth-btn" class="hero-action" type="button">Đăng nhập Admin</button>
             </div>
         </header>
 
-        <main class="dashboard-grid">
-            <div class="card">
-                <div class="card-head">
-                    <h3>🌤️ Môi Trường</h3>
-                    <span class="mini-label">Realtime</span>
+        <section class="stats-grid">
+            <article id="card-env" class="stat-card stat-warm">
+                <span class="stat-label">NHIỆT ĐỘ MÔI TRƯỜNG</span>
+                <strong id="temperatureValue" class="stat-value">--</strong>
+                <span class="stat-unit">°C</span>
+            </article>
+            <article class="stat-card stat-cool">
+                <span class="stat-label">ĐỘ ẨM KHÔNG KHÍ</span>
+                <strong id="humidityValue" class="stat-value">--</strong>
+                <span class="stat-unit">%</span>
+            </article>
+            <article id="card-parking" class="stat-card stat-mint">
+                <span class="stat-label">BÃI ĐỖ XE</span>
+                <strong id="parkingValue" class="stat-value">--</strong>
+                <span class="stat-unit">chỗ trống</span>
+                <div id="parkingStatus" class="parking-status">Đang chờ dữ liệu</div>
+            </article>
+            <article id="card-water" class="stat-card stat-sand stat-device">
+                <span class="stat-label">MỰC NƯỚC KHU VỰC</span>
+                <div class="device-row">
+                    <strong class="stat-value" id="waterLevelValue">--</strong>
+                    <span id="floodRiskBadge" class="status-badge">AN TOÀN</span>
                 </div>
-                <span class="data-val temp" id="temperatureValue">--</span>
-                <small class="unit-label">°C</small>
-                <hr class="divider">
-                <span class="data-val humi" id="humidityValue">--</span>
-                <small class="unit-label">%</small>
-            </div>
-
-            <div class="card">
-                <div class="card-head">
-                    <h3>🅿️ Bãi Đỗ Xe</h3>
-                    <span class="mini-label">RTDB</span>
-                </div>
-                <span class="data-val parking" id="parkingValue">--</span>
-                <small class="unit-label">Chỗ trống</small>
-                <div class="parking-status" id="parkingStatus">Đang chờ dữ liệu</div>
-            </div>
-
-            <div class="card">
-                <div class="card-head">
-                    <h3>💡 Đèn Báo Hiệu</h3>
-                    <span class="mini-label">smartcity/devices</span>
-                </div>
-                <p>Trạng thái: <strong id="streetLightState" class="device-off">--</strong></p>
-                <div class="device-meta" id="streetLightMeta">Chưa có dữ liệu</div>
-            </div>
-
-            <div class="card">
-                <div class="card-head">
-                    <h3>🌊 Hệ thống thoát nước</h3>
-                    <span class="mini-label">smartcity/devices</span>
-                </div>
-                <p>Trạng thái: <strong id="waterPumpState" class="device-off">--</strong></p>
-                <div class="device-meta" id="waterPumpMeta">Chưa có dữ liệu</div>
-            </div>
-        </main>
-
-        <section class="bottom-section">
-            <div class="info-container">
-                <h3>Tổng quan hệ thống</h3>
-                <p id="overviewText">Bảng điều khiển sẽ tự cập nhật dữ liệu khi ESP32 ghi lên Firebase.</p>
-                <p id="lastUpdateText">Chưa có bản ghi nào được tải.</p>
-            </div>
-            <div class="log-container">
-                <h3>📌 Ghi chú</h3>
-                <div class="log-item" id="logTemperature">Nhiệt độ: --</div>
-                <div class="log-item" id="logHumidity">Độ ẩm: --</div>
-                <div class="log-item" id="logParking">Parking: --</div>
-                <div class="log-item" id="logDevices">Thiết bị: --</div>
-            </div>
+                <span class="stat-unit">% mực nước</span>
+            </article>
         </section>
+
+        <section class="main-grid">
+            <article class="panel chart-panel">
+                <div class="panel-head">
+                    <h2>XU HƯỚNG CẢM BIẾN SMART CITY</h2>
+                    <span class="panel-note">Realtime Firebase</span>
+                </div>
+                <div class="chart-frame">
+                    <canvas id="tempChart" height="140"></canvas>
+                </div>
+            </article>
+
+            <article class="panel ai-panel">
+                <div class="panel-head">
+                    <h2>AI GIÁM SÁT ĐÔ THỊ</h2>
+                </div>
+                <div class="ai-stack">
+                    <section class="ai-block ai-neutral">
+                        <span class="ai-label">ADMIN ACCESS</span>
+                        <strong id="curatorAccess">Đăng nhập demo</strong>
+                    </section>
+                    <section class="ai-block ai-info">
+                        <span class="ai-label">ĐỘ ỔN ĐỊNH HỆ THỐNG</span>
+                        <strong id="curatorConfidence">60%</strong>
+                    </section>
+                    <section class="ai-block ai-neutral">
+                        <span class="ai-label">ANOMALY SCORE (AI)</span>
+                        <strong id="anomalyScore">0.0%</strong>
+                    </section>
+                    <section class="ai-block ai-neutral">
+                        <span class="ai-label">CHẤT LƯỢNG KHÔNG KHÍ (AQI*)</span>
+                        <strong id="airQualityValue">--</strong>
+                    </section>
+                    <section class="ai-block ai-info">
+                        <span class="ai-label">CƯỜNG ĐỘ ÁNH SÁNG</span>
+                        <strong id="lightLevelValue">--</strong>
+                    </section>
+                    <section class="ai-block ai-info">
+                        <span class="ai-label">RỦI RO ĐÔ THỊ</span>
+                        <strong id="riskState">Ổn định</strong>
+                    </section>
+                    <section class="ai-block ai-neutral">
+                        <span class="ai-label">NHẬT KÝ HOẠT ĐỘNG</span>
+                        <div id="activity-log" class="activity-log">
+                            <div class="log-item">Đang tải nhật ký...</div>
+                        </div>
+                    </section>
+                </div>
+            </article>
+        </section>
+
+        <section class="control-panel panel">
+            <div class="panel-head control-head">
+                <h2>ĐIỀU KHIỂN HẠ TẦNG ĐÔ THỊ</h2>
+                <div class="mode-actions admin-only">
+                    <button id="streetLightModeBtn" class="mode-btn" type="button"
+                        onclick="toggleMode('street_light_auto')">Đèn: AUTO</button>
+                    <button id="pumpModeBtn" class="mode-btn" type="button" onclick="toggleMode('pump_auto')">Bơm:
+                        AUTO</button>
+                </div>
+            </div>
+            <div class="control-grid">
+                <button id="streetLightToggle" class="control-toggle" type="button"
+                    onclick="toggleDevice('street_light')">
+                    <span class="control-title">Đèn đường</span>
+                    <span id="streetLightState" class="control-state device-off">OFF</span>
+                    <span id="streetLightHint" class="control-hint">Nhấn để bật/tắt</span>
+                </button>
+                <button id="waterPumpToggle" class="control-toggle" type="button" onclick="toggleDevice('water_pump')">
+                    <span class="control-title">Máy bơm thoát nước</span>
+                    <span id="waterPumpState" class="control-state device-off">OFF</span>
+                    <span id="waterPumpHint" class="control-hint">Nhấn để bật/tắt</span>
+                </button>
+            </div>
+            <div class="panel-note control-note">Firebase -> Smart City Controller (Wokwi Sync)</div>
+        </section>
+
+        <button id="assistant-launcher" class="ai-fab" type="button">AI</button>
+
+        <aside id="assistant-panel" class="assistant-panel" aria-label="AI Assist Chatbot">
+            <div class="assistant-header">
+                <div>
+                    <div class="assistant-eyebrow">AI ASSIST</div>
+                    <h3>Trợ lý đô thị</h3>
+                </div>
+                <button id="assistant-close" class="assistant-close" type="button">×</button>
+            </div>
+            <div id="assistant-messages" class="assistant-messages">
+                <div class="assistant-message bot">
+                    Chào bạn, mình có thể giải thích dữ liệu cảm biến, cảnh báo ngập, chất lượng không khí hoặc trạng
+                    thái đèn/bơm.
+                </div>
+            </div>
+            <div class="assistant-suggestions">
+                <button class="assistant-chip" type="button" data-prompt="Tình trạng ngập hiện tại thế nào?">Tình trạng
+                    ngập?</button>
+                <button class="assistant-chip" type="button" data-prompt="Đèn đường đang ở chế độ gì?">Đèn
+                    đường?</button>
+                <button class="assistant-chip" type="button" data-prompt="Chất lượng không khí ra sao?">Không
+                    khí?</button>
+            </div>
+            <form id="assistant-form" class="assistant-form">
+                <input id="assistant-input" type="text" placeholder="Hỏi mình về sensor, chế độ, cảnh báo...">
+                <button type="submit">Gửi</button>
+            </form>
+        </aside>
+
+        <div id="login-modal" class="login-modal">
+            <div class="login-box">
+                <h3>Đăng nhập Quản trị</h3>
+                <input type="email" id="email" placeholder="Email Admin">
+                <input type="password" id="password" placeholder="Mật khẩu">
+                <button class="control-btn btn-on" id="submit-login" type="button">Đăng Nhập</button>
+                <button class="hero-action hero-action-light" type="button" id="cancel-login">Hủy</button>
+            </div>
+        </div>
+
         <footer class="authors-footer">
-            <b>Giang Vĩnh Huy</b> <span style="color: #00d2ff;">(23119146)</span>
-            <span style="margin: 0 15px; opacity: 0.3;">|</span>
-            <b>Nguyễn Quang Nhơn</b> <span style="color: #00d2ff;">(23119184)</span>
+            <b>Giang Vĩnh Huy</b> <span class="footer-id">(23119146)</span>
+            <span class="footer-separator">|</span>
+            <b>Nguyễn Quang Nhơn</b> <span class="footer-id">(23119184)</span>
         </footer>
     </div>
     <script type="module" src="script.js"></script>
