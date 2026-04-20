@@ -216,12 +216,14 @@ const faceAuthState = {
 };
 
 const faceAuthConfig = {
-    modelUrl: 'https://justadudewhohacks.github.io/face-api.js/models',
+    modelUrl: './models',
     storageKey: 'smartcity_face_descriptor_v1',
     threshold: 0.38,
     minSamples: 3,
     maxSamples: 6,
-    sampleIntervalMs: 140
+    sampleIntervalMs: 140,
+    modelLoadTimeoutMs: 20000,
+    cameraStartTimeoutMs: 15000
 };
 
 const mapZoneMeta = new Map([
@@ -313,21 +315,52 @@ function saveFaceProfile(label, descriptor) {
     faceAuthState.descriptor = new Float32Array(descriptor);
 }
 
+async function waitForFaceApiScript(timeoutMs = 8000) {
+    if (window.faceapi) {
+        return window.faceapi;
+    }
+
+    return new Promise((resolve, reject) => {
+        const start = Date.now();
+        const check = () => {
+            if (window.faceapi) {
+                resolve(window.faceapi);
+                return;
+            }
+            if (Date.now() - start > timeoutMs) {
+                reject(new Error('face-api.js script chưa tải xong (timeout). Kiểm tra kết nối mạng.'));
+                return;
+            }
+            setTimeout(check, 200);
+        };
+        check();
+    });
+}
+
 async function loadFaceModels() {
     if (faceAuthState.modelsLoaded) {
         return;
     }
 
-    const faceApi = window.faceapi;
-    if (!faceApi) {
-        throw new Error('face-api.js chưa tải xong');
-    }
+    elements.faceLoginStatus.textContent = 'Đang chờ face-api.js tải về...';
+    elements.faceEnrollStatus.textContent = 'Đang chờ face-api.js tải về...';
 
-    await Promise.all([
+    const faceApi = await waitForFaceApiScript(10000);
+
+    elements.faceLoginStatus.textContent = 'Đang tải model nhận diện (có thể mất 10-20s)...';
+    elements.faceEnrollStatus.textContent = 'Đang tải model nhận diện (có thể mất 10-20s)...';
+
+    const loadModelsPromise = Promise.all([
         faceApi.nets.tinyFaceDetector.loadFromUri(faceAuthConfig.modelUrl),
         faceApi.nets.faceLandmark68Net.loadFromUri(faceAuthConfig.modelUrl),
         faceApi.nets.faceRecognitionNet.loadFromUri(faceAuthConfig.modelUrl)
     ]);
+
+    const timeoutPromise = new Promise((_, reject) => {
+        window.setTimeout(() => reject(new Error('Face models load timeout')), faceAuthConfig.modelLoadTimeoutMs);
+    });
+
+    await Promise.race([loadModelsPromise, timeoutPromise]);
 
     faceAuthState.modelsLoaded = true;
 }
@@ -503,11 +536,21 @@ async function captureStableDescriptor(videoElement) {
 async function startFaceCamera(mode) {
     const target = mode === 'enroll' ? elements.faceEnrollVideo : elements.faceLoginVideo;
 
+    if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error('Camera API not available');
+    }
+
     if (!faceAuthState.stream) {
-        faceAuthState.stream = await navigator.mediaDevices.getUserMedia({
+        const cameraPromise = navigator.mediaDevices.getUserMedia({
             video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
             audio: false
         });
+
+        const timeoutPromise = new Promise((_, reject) => {
+            window.setTimeout(() => reject(new Error('Camera start timeout')), faceAuthConfig.cameraStartTimeoutMs);
+        });
+
+        faceAuthState.stream = await Promise.race([cameraPromise, timeoutPromise]);
     }
 
     faceAuthState.activeMode = mode;
@@ -539,14 +582,24 @@ async function openFaceLoginModal(show) {
     elements.faceLoginStatus.textContent = 'Đang khởi tạo Face ID...';
     try {
         await loadFaceModels();
-        await startFaceCamera('login');
-        if (faceAuthState.descriptor) {
-            elements.faceLoginStatus.textContent = 'Mời đặt khuôn mặt vào khung và bấm Quét khuôn mặt.';
-        } else {
-            elements.faceLoginStatus.textContent = 'Chưa có khuôn mặt mẫu. Hãy dùng đăng nhập truyền thống để thêm khuôn mặt.';
-        }
     } catch (error) {
-        elements.faceLoginStatus.textContent = 'Không thể mở camera hoặc tải model Face ID.';
+        console.warn('Face model load failed:', error);
+        elements.faceLoginStatus.textContent = '⚠ Không tải được model Face ID. Bạn có thể dùng "Đăng nhập truyền thống" phía dưới.';
+        return;
+    }
+
+    try {
+        await startFaceCamera('login');
+    } catch (error) {
+        console.warn('Camera start failed:', error);
+        elements.faceLoginStatus.textContent = '⚠ Không thể mở camera. Kiểm tra quyền camera hoặc dùng "Đăng nhập truyền thống".';
+        return;
+    }
+
+    if (faceAuthState.descriptor) {
+        elements.faceLoginStatus.textContent = 'Mời đặt khuôn mặt vào khung và bấm Quét khuôn mặt.';
+    } else {
+        elements.faceLoginStatus.textContent = 'Chưa có khuôn mặt mẫu. Hãy dùng "Đăng nhập truyền thống" để thêm khuôn mặt.';
     }
 }
 
@@ -560,10 +613,18 @@ async function openFaceEnrollModal(show) {
     elements.faceEnrollStatus.textContent = 'Đang khởi tạo camera để thêm khuôn mặt...';
     try {
         await loadFaceModels();
+    } catch (error) {
+        console.warn('Face model load failed (enroll):', error);
+        elements.faceEnrollStatus.textContent = '⚠ Không tải được model Face ID. Kiểm tra kết nối mạng rồi thử lại.';
+        return;
+    }
+
+    try {
         await startFaceCamera('enroll');
         elements.faceEnrollStatus.textContent = 'Đặt khuôn mặt vào giữa khung rồi bấm Lưu khuôn mặt.';
     } catch (error) {
-        elements.faceEnrollStatus.textContent = 'Không thể mở camera để thêm khuôn mặt.';
+        console.warn('Camera start failed (enroll):', error);
+        elements.faceEnrollStatus.textContent = '⚠ Không thể mở camera. Kiểm tra quyền truy cập camera.';
     }
 }
 
