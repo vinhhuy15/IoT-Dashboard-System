@@ -10,6 +10,7 @@
 
 <p align="center">
   <a href="#features">Features</a> ·
+  <a href="#demo">Demo</a> ·
   <a href="#system-architecture">Architecture</a> ·
   <a href="#tech-stack">Tech Stack</a> ·
   <a href="#getting-started">Getting Started</a> ·
@@ -25,6 +26,12 @@
 Smart City Dashboard is an IoT project that simulates a smart city management system, consisting of embedded hardware (ESP32) running on the Wokwi simulator and a real-time web monitoring application. The system collects data from multiple sensors, stores it via Firebase Realtime Database, and displays it on a web dashboard with device control, Face ID authentication, and an AI chatbot assistant.
 
 This project was developed as a final assignment for the IoT course at **Ho Chi Minh City University of Technology and Education (HCMUTE)**.
+
+## Demo
+
+[![Watch the demo](https://img.shields.io/badge/Watch_Demo-YouTube-red?style=for-the-badge&logo=youtube)](https://youtu.be/hmhnHT6XhoQ?si=x-cRBhuz28Ez83hR)
+
+Click the badge above or watch directly: [Smart City Dashboard - Demo Video](https://youtu.be/hmhnHT6XhoQ?si=x-cRBhuz28Ez83hR)
 
 ## Features
 
