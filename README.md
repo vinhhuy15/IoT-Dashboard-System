@@ -14,6 +14,7 @@
   <a href="#tech-stack">Tech Stack</a> ·
   <a href="#getting-started">Getting Started</a> ·
   <a href="#project-structure">Project Structure</a> ·
+  <a href="#report">Report</a> ·
   <a href="#authors">Authors</a>
 </p>
 
@@ -130,6 +131,7 @@ project-iot-final/
 │   ├── platformio.ini            # PlatformIO configuration
 │   └── src/
 │       └── main.cpp              # ESP32 embedded code
+├── report.pdf                      # Project report (term paper)
 ├── README.md
 ├── LICENSE
 └── CONTRIBUTING.md
@@ -208,6 +210,12 @@ To access all features (device control, mode switching), you need to log in:
 
 - **Face ID**: Register your face after logging in with traditional credentials
 - **Email/Password**: Use a Firebase Authentication account
+
+## Report
+
+The full project report (term paper) is available here:
+
+[View Report (PDF)](report.pdf)
 
 ## Authors
 
